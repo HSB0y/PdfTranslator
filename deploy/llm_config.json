@@ -1,0 +1,5 @@
+﻿{
+    "number_thread": 8,
+    "optimization_level": "EXTENDED",
+    "max_length": 512
+}

@@ -1,0 +1,30 @@
+# IDEs Paths
+.cache/
+.idea/
+.vscode/
+.vs/
+
+# Build Paths
+build/
+
+# Configuration Files
+*.ini
+*.DS_Store
+
+# Powershell Files
+*.ps1
+
+
+# Drogon Paths
+uploads/
+packed/
+
+# Executable Files
+*.exe
+*.dll
+*.lib
+*.pdb
+*.a
+*.so
+*.dylib
+*.out

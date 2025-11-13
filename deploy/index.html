@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Viewer with Text Selection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+
+        .pdf-viewer {
+            flex: 0 0 80%;
+            border-right: 2px solid #ccc;
+            position: relative;
+        }
+
+        .pdf-viewer iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .text-display {
+            flex: 0 0 20%;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #f5f5f5;
+        }
+
+        .text-display h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+
+        .text-display p {
+            line-height: 1.6;
+            color: #555;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 16px;
+        }
+
+        .text-display p:empty::before {
+            content: "Select text in the PDF to display it here...";
+            color: #999;
+            font-style: italic;
+        }
+
+        #translatedText {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-radius: 4px;
+            min-height: 20px;
+        }
+
+        .open-pdf-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .open-pdf-btn:hover {
+            background-color: #0056b3;
+        }
+
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="pdf-viewer">
+            <iframe id="pdfViewer" src="/pdfjs/web/viewer.html"></iframe>
+        </div>
+        <div class="text-display">
+            <input type="file" id="fileInput" accept="application/pdf" />
+            <button class="open-pdf-btn" onclick="document.getElementById('fileInput').click()">Open PDF</button>
+            <h2>Selected Text</h2>
+            <p id="selectedText"></p>
+            <h2>Translation</h2>
+            <p id="translatedText"></p>
+        </div>
+    </div>
+
+    <script>
+        // Handle PDF file selection
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                const fileURL = URL.createObjectURL(file);
+                const iframe = document.getElementById('pdfViewer');
+                iframe.src = '/pdfjs/web/viewer.html?file=' + encodeURIComponent(fileURL);
+            }
+        });
+
+        // Function to send text to translation endpoint
+        function sendToTranslate(text) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/translate', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response.status === 'success') {
+                                document.getElementById('translatedText').textContent = response.translated_text;
+                            } else {
+                                document.getElementById('translatedText').textContent = 'Translation failed';
+                                console.error('Translation failed:', response);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing response:', e);
+                            document.getElementById('translatedText').textContent = 'Error processing translation';
+                        }
+                    } else {
+                        console.error('Failed to send text to /translate:', xhr.status);
+                        document.getElementById('translatedText').textContent = 'Error: Failed to connect to translation service';
+                    }
+                }
+            };
+            
+            xhr.send(JSON.stringify({ text: text }));
+        }
+
+        // Listen for text selection events from the PDF viewer
+        window.addEventListener('message', function(event) {
+            // Check if the message is from the PDF viewer iframe
+            if (event.data && event.data.type === 'textSelected') {
+                const selectedTextElement = document.getElementById('selectedText');
+                selectedTextElement.textContent = event.data.text;
+                
+                // Send to translate endpoint
+                if (event.data.text) {
+                    sendToTranslate(event.data.text);
+                }
+            }
+        });
+
+        // Alternative: Monitor selection changes in the iframe
+        // Note: This requires the PDF.js viewer to be on the same origin
+        const iframe = document.getElementById('pdfViewer');
+        
+        // Try to access iframe content (will only work if same-origin)
+        iframe.addEventListener('load', function() {
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                iframeDoc.addEventListener('mouseup', function() {
+                    setTimeout(function() {
+                        const selection = iframe.contentWindow.getSelection();
+                        const selectedText = selection.toString().trim();
+                        
+                        if (selectedText) {
+                            document.getElementById('selectedText').textContent = selectedText;
+                            
+                            // Send to translate endpoint
+                            sendToTranslate(selectedText);
+                        }
+                    }, 100);
+                });
+            } catch (e) {
+                console.log('Cannot access iframe content (cross-origin restriction):', e);
+                console.log('Please ensure PDF.js is served from the same origin or use postMessage API');
+            }
+        });
+    </script>
+</body>
+</html>
